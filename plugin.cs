@@ -95,28 +95,33 @@ namespace SLine
 
             lineObj.SetActive(true);
             var img = lineObj.GetComponent<Image>();
-            if (strikerIcon.unit is Aircraft)
+            
+            if (target is Aircraft)
             {
-                img.color = new Color(1f, 0f, 1f, 0.8f); // Magenta
-            }
-            else
-            {
-                if (target is Aircraft)
+                if (strikerIcon.unit is Missile)
                 {
                     img.color = new Color(0f, 1f, 1f, 0.8f); // Cyan
                 }
-                else if (target is Ship)
-                {
-                    img.color = new Color(1f, 0f, 0f, 0.8f); // Red
-                }
-                else if (target is Missile)
+                else
                 {
                     img.color = new Color(1f, 1f, 1f, 0.8f); // White
                 }
-                else 
-                {
-                    img.color = new Color(1f, 1f, 0f, 0.8f); // Yellow (Ground)
-                }
+            }
+            else if (strikerIcon.unit is Aircraft)
+            {
+                img.color = new Color(1f, 0f, 1f, 0.8f); // Magenta
+            }
+            else if (target is Missile)
+            {
+                img.color = new Color(0f, 1f, 1f, 0.8f); // Cyan
+            }
+            else if (target is Ship)
+            {
+                img.color = new Color(1f, 0f, 0f, 0.8f); // Red
+            }
+            else 
+            {
+                img.color = new Color(1f, 1f, 0f, 0.8f); // Yellow (Ground)
             }
 
             var rect = lineObj.GetComponent<RectTransform>();
