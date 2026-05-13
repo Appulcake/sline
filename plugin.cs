@@ -59,7 +59,7 @@ namespace SLine
                         UnitMapIcon targetIcon = null;
                         if (DynamicMap.TryGetMapIcon(target, out targetIcon) && targetIcon != null && targetIcon.gameObject.activeInHierarchy)
                         {
-                            UpdateLine(icon, targetIcon, lines);
+                            UpdateLine(icon, targetIcon, lines, target);
                             updatedIcons.Add(icon);
                             continue;
                         }
@@ -85,7 +85,7 @@ namespace SLine
             }
         }
 
-        private static void UpdateLine(UnitMapIcon strikerIcon, UnitMapIcon targetIcon, Dictionary<UnitMapIcon, GameObject> lines)
+        private static void UpdateLine(UnitMapIcon strikerIcon, UnitMapIcon targetIcon, Dictionary<UnitMapIcon, GameObject> lines, Unit target)
         {
             if (!lines.TryGetValue(strikerIcon, out var lineObj) || lineObj == null)
             {
@@ -94,6 +94,31 @@ namespace SLine
             }
 
             lineObj.SetActive(true);
+            var img = lineObj.GetComponent<Image>();
+            if (strikerIcon.unit is Aircraft)
+            {
+                img.color = new Color(1f, 0f, 1f, 0.8f); // Magenta
+            }
+            else
+            {
+                if (target is Aircraft)
+                {
+                    img.color = new Color(0f, 1f, 1f, 0.8f); // Cyan
+                }
+                else if (target is Ship)
+                {
+                    img.color = new Color(1f, 0f, 0f, 0.8f); // Red
+                }
+                else if (target is Missile)
+                {
+                    img.color = new Color(1f, 1f, 1f, 0.8f); // White
+                }
+                else 
+                {
+                    img.color = new Color(1f, 1f, 0f, 0.8f); // Yellow (Ground)
+                }
+            }
+
             var rect = lineObj.GetComponent<RectTransform>();
             
             // Positions are in local space of the icon layer
