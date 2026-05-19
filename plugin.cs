@@ -1,20 +1,142 @@
 using HarmonyLib;
 using UnityEngine;
 using UnityEngine.UI;
+using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
 using BepInEx;
+using BepInEx.Configuration;
 
 namespace SLine
 {
     [BepInPlugin("com.sline", "SLine Target Mod", "1.0.0")]
     public class SLineMod : BaseUnityPlugin
     {
+        public static ConfigEntry<bool> GlobalToggle;
+        public static ConfigEntry<float> LineThickness;
+
+        public static ConfigEntry<KeyboardShortcut> AircraftKey;
+        public static ConfigEntry<bool> AircraftHold;
+        public static bool AircraftToggled = false;
+
+        public static ConfigEntry<KeyboardShortcut> GroundKey;
+        public static ConfigEntry<bool> GroundHold;
+        public static bool GroundToggled = false;
+
+        public static ConfigEntry<KeyboardShortcut> ShipKey;
+        public static ConfigEntry<bool> ShipHold;
+        public static bool ShipToggled = false;
+
+        public static ConfigEntry<KeyboardShortcut> MissileKey;
+        public static ConfigEntry<bool> MissileHold;
+        public static bool MissileToggled = false;
+
+        public static Dictionary<string, ConfigEntry<bool>> UnitWhitelists = new Dictionary<string, ConfigEntry<bool>>();
+
+        public static SLineMod Instance;
+
         private void Awake()
         {
+            Instance = this;
+
+            GlobalToggle = Config.Bind("1. Global Settings", "Global Toggle", true, "Master switch to show/hide lines by default.");
+            LineThickness = Config.Bind("1. Global Settings", "Line Thickness", 0.1f, "Thickness of the lines drawn on the map.");
+
+            AircraftKey = Config.Bind("2. Keybinds", "Aircraft Lines Key", new KeyboardShortcut(KeyCode.None), "Keybind to toggle/hold Aircraft lines.");
+            AircraftHold = Config.Bind("2. Keybinds", "Aircraft Lines Hold Mode", false, "If true, key must be held instead of toggled.");
+
+            GroundKey = Config.Bind("2. Keybinds", "Ground Lines Key", new KeyboardShortcut(KeyCode.None), "Keybind to toggle/hold Ground lines.");
+            GroundHold = Config.Bind("2. Keybinds", "Ground Lines Hold Mode", false, "If true, key must be held instead of toggled.");
+
+            ShipKey = Config.Bind("2. Keybinds", "Ship Lines Key", new KeyboardShortcut(KeyCode.None), "Keybind to toggle/hold Ship lines.");
+            ShipHold = Config.Bind("2. Keybinds", "Ship Lines Hold Mode", false, "If true, key must be held instead of toggled.");
+
+            MissileKey = Config.Bind("2. Keybinds", "Missile Lines Key", new KeyboardShortcut(KeyCode.None), "Keybind to toggle/hold Missile lines.");
+            MissileHold = Config.Bind("2. Keybinds", "Missile Lines Hold Mode", false, "If true, key must be held instead of toggled.");
+
             var harmony = new Harmony("com.sline");
             harmony.PatchAll();
+            StartCoroutine(ScanRoutine());
             Logger.LogInfo("SLine Mod Initialized");
+        }
+
+        private IEnumerator ScanRoutine()
+        {
+            // Wait 5 seconds on startup for the game to populate definition assets in memory
+            yield return new WaitForSeconds(5f);
+            ScanAllUnitDefinitions();
+
+            float lastDefScan = Time.time;
+            while (true)
+            {
+                yield return new WaitForSeconds(5f);
+                // Re-scan definitions periodically to catch dynamically loaded mod units
+                if (Time.time - lastDefScan > 30f)
+                {
+                    ScanAllUnitDefinitions();
+                    lastDefScan = Time.time;
+                }
+            }
+        }
+
+        private void ScanAllUnitDefinitions()
+        {
+            var defs = Resources.FindObjectsOfTypeAll<UnitDefinition>();
+            foreach (var def in defs)
+            {
+                if (def == null) continue;
+                
+                string unitName = def.unitName;
+                if (string.IsNullOrEmpty(unitName)) unitName = def.name;
+                if (string.IsNullOrEmpty(unitName)) continue;
+
+                string category;
+                if (def is AircraftDefinition) category = "Aircraft";
+                else if (def is ShipDefinition) category = "Ship";
+                else if (def is MissileDefinition) category = "Missile";
+                else category = "Ground";
+
+                unitName = SLineMod.SanitizeConfigKey(unitName);
+                
+                GetOrAddWhitelist(category, unitName);
+            }
+            Logger.LogInfo($"Pre-scanned {UnitWhitelists.Count} unit definitions into whitelist.");
+        }
+
+        private void Update()
+        {
+            // Process inputs
+            if (AircraftHold.Value) AircraftToggled = AircraftKey.Value.IsPressed();
+            else if (AircraftKey.Value.IsDown()) AircraftToggled = !AircraftToggled;
+
+            if (GroundHold.Value) GroundToggled = GroundKey.Value.IsPressed();
+            else if (GroundKey.Value.IsDown()) GroundToggled = !GroundToggled;
+
+            if (ShipHold.Value) ShipToggled = ShipKey.Value.IsPressed();
+            else if (ShipKey.Value.IsDown()) ShipToggled = !ShipToggled;
+
+            if (MissileHold.Value) MissileToggled = MissileKey.Value.IsPressed();
+            else if (MissileKey.Value.IsDown()) MissileToggled = !MissileToggled;
+        }
+
+        public static string SanitizeConfigKey(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return "Unknown";
+            return s.Replace("=", "").Replace("\n", "").Replace("\t", "").Replace("\\", "")
+                    .Replace("\"", "").Replace("'", "").Replace("[", "(").Replace("]", ")").Trim();
+        }
+
+        public ConfigEntry<bool> GetOrAddWhitelist(string category, string unitName)
+        {
+            string safeCategory = SanitizeConfigKey(category);
+            string safeUnitName = SanitizeConfigKey(unitName);
+            string key = $"{safeCategory}_{safeUnitName}";
+            if (!UnitWhitelists.TryGetValue(key, out var entry))
+            {
+                entry = Config.Bind($"3. Whitelist: {safeCategory}", safeUnitName, true, $"Enable SLine originating from {safeUnitName}");
+                UnitWhitelists[key] = entry;
+            }
+            return entry;
         }
     }
 
@@ -38,6 +160,41 @@ namespace SLine
                 {
                     var icon = baseIcon as UnitMapIcon;
                     if (icon == null || icon.unit == null || !icon.gameObject.activeInHierarchy) continue;
+
+                    string category;
+                    bool categoryToggled = false;
+                    if (icon.unit is Aircraft) {
+                        category = "Aircraft";
+                        categoryToggled = SLineMod.AircraftToggled;
+                    } else if (icon.unit is Ship) {
+                        category = "Ship";
+                        categoryToggled = SLineMod.ShipToggled;
+                    } else if (icon.unit is Missile) {
+                        category = "Missile";
+                        categoryToggled = SLineMod.MissileToggled;
+                    } else {
+                        category = "Ground";
+                        categoryToggled = SLineMod.GroundToggled;
+                    }
+
+                    bool globalShow = SLineMod.GlobalToggle.Value;
+                    bool finalShow = globalShow ^ categoryToggled;
+
+                    if (!finalShow) {
+                        HideLine(icon, lines);
+                        continue;
+                    }
+
+                    string unitName = icon.unit.unitName;
+                    if (string.IsNullOrEmpty(unitName)) unitName = icon.unit.gameObject.name.Replace("(Clone)", "").Trim();
+                    
+                    unitName = SLineMod.SanitizeConfigKey(unitName);
+
+                    var whitelistEntry = SLineMod.Instance.GetOrAddWhitelist(category, unitName);
+                    if (!whitelistEntry.Value) {
+                        HideLine(icon, lines);
+                        continue;
+                    }
 
                     Unit target = null;
                     if (icon.unit is Missile missile)
@@ -143,7 +300,7 @@ namespace SLine
 
             rect.localPosition = startPos;
             rect.localRotation = Quaternion.Euler(0, 0, angle);
-            rect.sizeDelta = new Vector2(distance, 0.1f);
+            rect.sizeDelta = new Vector2(distance, SLineMod.LineThickness.Value);
         }
 
         private static void HideLine(UnitMapIcon strikerIcon, Dictionary<UnitMapIcon, GameObject> lines)
