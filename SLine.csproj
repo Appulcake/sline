@@ -66,6 +66,10 @@
       <HintPath>C:\Program Files\Steam\steamapps\common\Nuclear Option\BepInEx\core\BepInEx.dll</HintPath>
       <Private>False</Private>
     </Reference>
+    <Reference Include="Rewired_Core">
+      <HintPath>C:\Program Files\Steam\steamapps\common\Nuclear Option\NuclearOption_Data\Managed\Rewired_Core.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
   </ItemGroup>
 
 </Project>

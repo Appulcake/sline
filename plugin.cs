@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using System.Reflection;
 using BepInEx;
 using BepInEx.Configuration;
+using Rewired;
 
 namespace SLine
 {
@@ -15,19 +16,15 @@ namespace SLine
         public static ConfigEntry<bool> GlobalToggle;
         public static ConfigEntry<float> LineThickness;
 
-        public static ConfigEntry<KeyboardShortcut> AircraftKey;
         public static ConfigEntry<bool> AircraftHold;
         public static bool AircraftToggled = false;
 
-        public static ConfigEntry<KeyboardShortcut> GroundKey;
         public static ConfigEntry<bool> GroundHold;
         public static bool GroundToggled = false;
 
-        public static ConfigEntry<KeyboardShortcut> ShipKey;
         public static ConfigEntry<bool> ShipHold;
         public static bool ShipToggled = false;
 
-        public static ConfigEntry<KeyboardShortcut> MissileKey;
         public static ConfigEntry<bool> MissileHold;
         public static bool MissileToggled = false;
 
@@ -42,22 +39,22 @@ namespace SLine
             GlobalToggle = Config.Bind("1. Global Settings", "Global Toggle", true, "Master switch to show/hide lines by default.");
             LineThickness = Config.Bind("1. Global Settings", "Line Thickness", 0.1f, "Thickness of the lines drawn on the map.");
 
-            AircraftKey = Config.Bind("2. Keybinds", "Aircraft Lines Key", new KeyboardShortcut(KeyCode.None), "Keybind to toggle/hold Aircraft lines.");
             AircraftHold = Config.Bind("2. Keybinds", "Aircraft Lines Hold Mode", false, "If true, key must be held instead of toggled.");
-
-            GroundKey = Config.Bind("2. Keybinds", "Ground Lines Key", new KeyboardShortcut(KeyCode.None), "Keybind to toggle/hold Ground lines.");
             GroundHold = Config.Bind("2. Keybinds", "Ground Lines Hold Mode", false, "If true, key must be held instead of toggled.");
-
-            ShipKey = Config.Bind("2. Keybinds", "Ship Lines Key", new KeyboardShortcut(KeyCode.None), "Keybind to toggle/hold Ship lines.");
             ShipHold = Config.Bind("2. Keybinds", "Ship Lines Hold Mode", false, "If true, key must be held instead of toggled.");
-
-            MissileKey = Config.Bind("2. Keybinds", "Missile Lines Key", new KeyboardShortcut(KeyCode.None), "Keybind to toggle/hold Missile lines.");
             MissileHold = Config.Bind("2. Keybinds", "Missile Lines Hold Mode", false, "If true, key must be held instead of toggled.");
+
+            // Register custom input actions via in-game controls system
+            ExtraInputManager.LoadPendingActions();
+            ExtraInputManager.RegisterAction("ToggleAircraftLines", Rewired.InputActionType.Button);
+            ExtraInputManager.RegisterAction("ToggleGroundLines", Rewired.InputActionType.Button);
+            ExtraInputManager.RegisterAction("ToggleShipLines", Rewired.InputActionType.Button);
+            ExtraInputManager.RegisterAction("ToggleMissileLines", Rewired.InputActionType.Button);
 
             var harmony = new Harmony("com.sline");
             harmony.PatchAll();
             StartCoroutine(ScanRoutine());
-            Logger.LogInfo("SLine Mod Initialized");
+            Logger.LogInfo("SLine Mod Initialized with extra Rewired keybinding system");
         }
 
         private IEnumerator ScanRoutine()
@@ -105,18 +102,54 @@ namespace SLine
 
         private void Update()
         {
-            // Process inputs
-            if (AircraftHold.Value) AircraftToggled = AircraftKey.Value.IsPressed();
-            else if (AircraftKey.Value.IsDown()) AircraftToggled = !AircraftToggled;
+            if (!ExtraInputManager.RewiredInitialized) return;
 
-            if (GroundHold.Value) GroundToggled = GroundKey.Value.IsPressed();
-            else if (GroundKey.Value.IsDown()) GroundToggled = !GroundToggled;
+            bool inChat = false;
+            try { inChat = CursorManager.GetFlag(CursorFlags.Chat); } catch {}
+            if (inChat) return;
 
-            if (ShipHold.Value) ShipToggled = ShipKey.Value.IsPressed();
-            else if (ShipKey.Value.IsDown()) ShipToggled = !ShipToggled;
+            Rewired.Player localPlayer = ReInput.players.GetPlayer(0);
+            if (localPlayer == null) return;
 
-            if (MissileHold.Value) MissileToggled = MissileKey.Value.IsPressed();
-            else if (MissileKey.Value.IsDown()) MissileToggled = !MissileToggled;
+            // Aircraft
+            if (AircraftHold.Value)
+            {
+                AircraftToggled = localPlayer.GetButton("ToggleAircraftLines");
+            }
+            else if (localPlayer.GetButtonDown("ToggleAircraftLines"))
+            {
+                AircraftToggled = !AircraftToggled;
+            }
+
+            // Ground
+            if (GroundHold.Value)
+            {
+                GroundToggled = localPlayer.GetButton("ToggleGroundLines");
+            }
+            else if (localPlayer.GetButtonDown("ToggleGroundLines"))
+            {
+                GroundToggled = !GroundToggled;
+            }
+
+            // Ship
+            if (ShipHold.Value)
+            {
+                ShipToggled = localPlayer.GetButton("ToggleShipLines");
+            }
+            else if (localPlayer.GetButtonDown("ToggleShipLines"))
+            {
+                ShipToggled = !ShipToggled;
+            }
+
+            // Missile
+            if (MissileHold.Value)
+            {
+                MissileToggled = localPlayer.GetButton("ToggleMissileLines");
+            }
+            else if (localPlayer.GetButtonDown("ToggleMissileLines"))
+            {
+                MissileToggled = !MissileToggled;
+            }
         }
 
         public static string SanitizeConfigKey(string s)
@@ -346,6 +379,216 @@ namespace SLine
         public static void Prefix(UnitMapIcon __instance)
         {
             DynamicMap_Update_Patch.ExternalCleanup(__instance);
+        }
+    }
+
+    [HarmonyPatch(typeof(InputManager_Base), "Awake")]
+    public static class RewiredActionInjector
+    {
+        static void Prefix(InputManager_Base __instance)
+        {
+            UnityEngine.Debug.Log("RewiredActionInjector: InputManager_Base.Awake Prefix triggered!");
+            try
+            {
+                InjectActions(__instance);
+            }
+            catch (System.Exception ex)
+            {
+                UnityEngine.Debug.LogError($"RewiredActionInjector: Exception in Prefix/InjectActions: {ex}");
+            }
+        }
+
+        private static void InjectActions(InputManager_Base manager)
+        {
+            UnityEngine.Debug.Log("RewiredActionInjector: Starting InjectActions...");
+            
+            var userDataField = typeof(InputManager_Base).GetField("_userData", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Public);
+            if (userDataField == null)
+            {
+                UnityEngine.Debug.LogWarning("RewiredActionInjector: _userData field not found on InputManager_Base!");
+                return;
+            }
+            
+            UnityEngine.Debug.Log("RewiredActionInjector: Found _userData field, retrieving value...");
+            var userData = userDataField.GetValue(manager);
+            if (userData == null)
+            {
+                UnityEngine.Debug.LogWarning("RewiredActionInjector: _userData value is null on InputManager_Base!");
+                return;
+            }
+            
+            UnityEngine.Debug.Log($"RewiredActionInjector: Found _userData ({userData.GetType().FullName}). Retrieving actions list...");
+
+            // Get actions list
+            var actionsField = userData.GetType().GetField("actions", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+            var actions = actionsField?.GetValue(userData) as System.Collections.Generic.List<InputAction>;
+            if (actions == null)
+            {
+                UnityEngine.Debug.Log("RewiredActionInjector: actions field cast failed, trying property...");
+                var actionsProp = userData.GetType().GetProperty("actions", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+                actions = actionsProp?.GetValue(userData) as System.Collections.Generic.List<InputAction>;
+            }
+            
+            if (actions == null)
+            {
+                UnityEngine.Debug.LogWarning("RewiredActionInjector: actions list is null!");
+                return;
+            }
+            UnityEngine.Debug.Log($"RewiredActionInjector: Found actions list with {actions.Count} existing actions. Retrieving categories...");
+
+            // Get actionCategories list
+            var categoriesField = userData.GetType().GetField("actionCategories", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+            var categories = categoriesField?.GetValue(userData) as System.Collections.Generic.List<InputCategory>;
+            if (categories == null)
+            {
+                UnityEngine.Debug.Log("RewiredActionInjector: actionCategories field cast failed, trying property...");
+                var categoriesProp = userData.GetType().GetProperty("actionCategories", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+                categories = categoriesProp?.GetValue(userData) as System.Collections.Generic.List<InputCategory>;
+            }
+            
+            if (categories == null)
+            {
+                UnityEngine.Debug.LogWarning("RewiredActionInjector: actionCategories list is null!");
+                return;
+            }
+            UnityEngine.Debug.Log($"RewiredActionInjector: Found categories list with {categories.Count} categories.");
+
+            InputCategory debugCategory = null;
+            foreach (var c in categories)
+            {
+                if (c.name == "Debug")
+                {
+                    debugCategory = c;
+                    break;
+                }
+            }
+            if (debugCategory == null)
+            {
+                UnityEngine.Debug.Log("RewiredActionInjector: 'Debug' category not found, falling back to first category.");
+                if (categories.Count > 0)
+                {
+                    debugCategory = categories[0];
+                }
+            }
+
+            if (debugCategory == null)
+            {
+                UnityEngine.Debug.LogWarning("RewiredActionInjector: No categories found at all!");
+                return;
+            }
+            UnityEngine.Debug.Log($"RewiredActionInjector: Selected category is '{debugCategory.name}' (id={debugCategory.id}).");
+
+            int nextId = GetNextActionId(actions);
+            UnityEngine.Debug.Log($"RewiredActionInjector: Determined nextActionId = {nextId}. Injecting pending actions...");
+
+            foreach (var modAction in ExtraInputManager.PendingActions)
+            {
+                UnityEngine.Debug.Log($"RewiredActionInjector: Processing pending action '{modAction.Name}'...");
+                bool exists = false;
+                foreach (var a in actions)
+                {
+                    if (a.name == modAction.Name)
+                    {
+                        exists = true;
+                        break;
+                    }
+                }
+                if (exists)
+                {
+                    UnityEngine.Debug.Log($"RewiredActionInjector: Action '{modAction.Name}' already exists, skipping injection.");
+                    continue;
+                }
+
+                var action = new InputAction();
+                SetField(action, "id", nextId++);
+                SetField(action, "name", modAction.Name);
+                SetField(action, "type", modAction.Type);
+                SetField(action, "descriptiveName", modAction.Name);
+                SetField(action, "categoryId", debugCategory.id);
+                SetField(action, "_userAssignable", true);
+
+                actions.Add(action);
+                UnityEngine.Debug.Log($"RewiredActionInjector: Injected '{modAction.Name}' action object into list.");
+
+                // Invoke userData.actionCategoryMap.AddAction(categoryId, actionId)
+                var categoryMapField = userData.GetType().GetField("actionCategoryMap", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+                var categoryMap = categoryMapField?.GetValue(userData);
+                if (categoryMap != null)
+                {
+                    var addActionMethod = categoryMap.GetType().GetMethod("AddAction", new System.Type[] { typeof(int), typeof(int) });
+                    if (addActionMethod != null)
+                    {
+                        addActionMethod.Invoke(categoryMap, new object[] { debugCategory.id, action.id });
+                        UnityEngine.Debug.Log($"RewiredActionInjector: Mapped '{modAction.Name}' (ID={action.id}) to category (ID={debugCategory.id}) in categoryMap.");
+                    }
+                    else
+                    {
+                        UnityEngine.Debug.LogWarning("RewiredActionInjector: AddAction method not found on actionCategoryMap!");
+                    }
+                }
+                else
+                {
+                    UnityEngine.Debug.LogWarning("RewiredActionInjector: actionCategoryMap field is null!");
+                }
+
+                modAction.AssignedId = action.id;
+            }
+            ExtraInputManager.RewiredInitialized = true;
+            UnityEngine.Debug.Log("RewiredActionInjector: Action injection successfully completed!");
+        }
+
+        private static void SetField(object obj, string fieldName, object value)
+        {
+            if (obj == null) return;
+            var t = obj.GetType();
+            
+            // Try setting direct field
+            var field = t.GetField(fieldName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+            if (field != null)
+            {
+                field.SetValue(obj, value);
+                return;
+            }
+
+            // Try backing field name
+            string backingName = $"<{fieldName}>k__BackingField";
+            field = t.GetField(backingName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            if (field != null)
+            {
+                field.SetValue(obj, value);
+                return;
+            }
+
+            // Try with prefix underscore
+            field = t.GetField("_" + fieldName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
+            if (field != null)
+            {
+                field.SetValue(obj, value);
+                return;
+            }
+
+            // Try setting property if writable
+            var prop = t.GetProperty(fieldName, System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+            if (prop != null && prop.CanWrite)
+            {
+                prop.SetValue(obj, value, null);
+            }
+        }
+
+        private static int GetNextActionId(System.Collections.Generic.List<InputAction> actions)
+        {
+            if (actions.Count == 0)
+                return 1000;
+
+            int maxId = 1000;
+            foreach (var a in actions)
+            {
+                if (a.id > maxId)
+                {
+                    maxId = a.id;
+                }
+            }
+            return maxId + 1;
         }
     }
 }
