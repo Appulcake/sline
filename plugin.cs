@@ -28,6 +28,9 @@ namespace SLine
         public static ConfigEntry<bool> MissileHold;
         public static bool MissileToggled = false;
 
+        public static ConfigEntry<bool> CruiseMissileHold;
+        public static bool CruiseMissileToggled = false;
+
         public static Dictionary<string, ConfigEntry<bool>> UnitWhitelists = new Dictionary<string, ConfigEntry<bool>>();
 
         public static SLineMod Instance;
@@ -43,6 +46,7 @@ namespace SLine
             GroundHold = Config.Bind("2. Keybinds", "Ground Lines Hold Mode", false, "If true, key must be held instead of toggled.");
             ShipHold = Config.Bind("2. Keybinds", "Ship Lines Hold Mode", false, "If true, key must be held instead of toggled.");
             MissileHold = Config.Bind("2. Keybinds", "Missile Lines Hold Mode", false, "If true, key must be held instead of toggled.");
+            CruiseMissileHold = Config.Bind("2. Keybinds", "Cruise Missile Lines Hold Mode", false, "If true, key must be held instead of toggled.");
 
             // Register custom input actions via in-game controls system
             ExtraInputManager.LoadPendingActions();
@@ -50,6 +54,7 @@ namespace SLine
             ExtraInputManager.RegisterAction("ToggleGroundLines", Rewired.InputActionType.Button);
             ExtraInputManager.RegisterAction("ToggleShipLines", Rewired.InputActionType.Button);
             ExtraInputManager.RegisterAction("ToggleMissileLines", Rewired.InputActionType.Button);
+            ExtraInputManager.RegisterAction("ToggleCruiseMissileLines", Rewired.InputActionType.Button);
 
             var harmony = new Harmony("com.sline");
             harmony.PatchAll();
@@ -150,6 +155,16 @@ namespace SLine
             {
                 MissileToggled = !MissileToggled;
             }
+
+            // Cruise Missile
+            if (CruiseMissileHold.Value)
+            {
+                CruiseMissileToggled = localPlayer.GetButton("ToggleCruiseMissileLines");
+            }
+            else if (localPlayer.GetButtonDown("ToggleCruiseMissileLines"))
+            {
+                CruiseMissileToggled = !CruiseMissileToggled;
+            }
         }
 
         public static string SanitizeConfigKey(string s)
@@ -203,8 +218,20 @@ namespace SLine
                         category = "Ship";
                         categoryToggled = SLineMod.ShipToggled;
                     } else if (icon.unit is Missile) {
-                        category = "Missile";
-                        categoryToggled = SLineMod.MissileToggled;
+                        var missileType = icon.unit as Missile;
+                        var seeker = missileType.GetComponent<MissileSeeker>();
+                        string seekerType = seeker.GetSeekerType();
+                        if (seekerType == "INS / Opt.")
+                        {
+                            category = "CruiseMissile";
+                            categoryToggled = SLineMod.CruiseMissileToggled;
+                        } else
+                        {
+                            category = "Missile";
+                            categoryToggled = SLineMod.MissileToggled;
+                        }
+                        
+
                     } else {
                         category = "Ground";
                         categoryToggled = SLineMod.GroundToggled;
