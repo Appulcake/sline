@@ -15,6 +15,7 @@ namespace SLine
     {
         public static ConfigEntry<bool> GlobalToggle;
         public static ConfigEntry<float> LineThickness;
+        public static ConfigEntry<bool> ShowFriendlyOnly;
 
         public static ConfigEntry<bool> AircraftHold;
         public static bool AircraftToggled = false;
@@ -41,6 +42,7 @@ namespace SLine
 
             GlobalToggle = Config.Bind("1. Global Settings", "Global Toggle", true, "Master switch to show/hide lines by default.");
             LineThickness = Config.Bind("1. Global Settings", "Line Thickness", 0.1f, "Thickness of the lines drawn on the map.");
+            ShowFriendlyOnly = Config.Bind("1. Global Settings", "Show Friendly Only", false, "Only show lines belonging to friendly units.");
 
             AircraftHold = Config.Bind("2. Keybinds", "Aircraft Lines Hold Mode", false, "If true, key must be held instead of toggled.");
             GroundHold = Config.Bind("2. Keybinds", "Ground Lines Hold Mode", false, "If true, key must be held instead of toggled.");
@@ -207,6 +209,14 @@ namespace SLine
                 foreach (var baseIcon in icons)
                 {
                     var icon = baseIcon as UnitMapIcon;
+                    
+                    bool unitIsPlayerHq = GameManager.IsLocalHQ(icon.unit.NetworkHQ);
+                    
+                    if (!unitIsPlayerHq && SLineMod.ShowFriendlyOnly.Value)
+                    {
+                        continue;
+                    }
+                    
                     if (icon == null || icon.unit == null || !icon.gameObject.activeInHierarchy) continue;
 
                     string category;
