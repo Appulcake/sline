@@ -1,11 +1,12 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
+    <Game_Path>Y:\Games\steamapps\common\Nuclear Option\NuclearOption_Data\Managed</Game_Path>
     <TargetFramework>net48</TargetFramework>
     <DisableImplicitFrameworkReferences>true</DisableImplicitFrameworkReferences>
     <AssemblyName>SLine</AssemblyName>
     <RootNamespace>SLine</RootNamespace>
-    <Version>1.0.0</Version>
+    <Version>1.6.0</Version>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
 
@@ -17,62 +18,58 @@
   
   <ItemGroup>
     <Reference Include="mscorlib">
-      <HintPath>..\..\COMPILER_HERE\game\mscorlib.dll</HintPath>
+      <HintPath>$(Game_Path)\mscorlib.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="System">
-      <HintPath>..\..\COMPILER_HERE\game\System.dll</HintPath>
+      <HintPath>$(Game_Path)\System.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="System.Core">
-      <HintPath>..\..\COMPILER_HERE\game\System.Core.dll</HintPath>
+      <HintPath>$(Game_Path)\System.Core.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="netstandard">
-      <HintPath>..\..\COMPILER_HERE\game\netstandard.dll</HintPath>
+      <HintPath>$(Game_Path)\netstandard.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Assembly-CSharp">
-      <HintPath>..\..\COMPILER_HERE\game\Assembly-CSharp.dll</HintPath>
+      <HintPath>$(Game_Path)\Assembly-CSharp.dll</HintPath>
       <Private>False</Private>
       <Publicize>True</Publicize>
     </Reference>
     <Reference Include="Mirage">
-      <HintPath>..\..\COMPILER_HERE\game\Mirage.dll</HintPath>
+      <HintPath>$(Game_Path)\Mirage.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine">
-      <HintPath>..\..\COMPILER_HERE\game\UnityEngine.dll</HintPath>
+      <HintPath>$(Game_Path)\UnityEngine.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.UI">
-      <HintPath>..\..\COMPILER_HERE\game\UnityEngine.UI.dll</HintPath>
+      <HintPath>$(Game_Path)\UnityEngine.UI.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.CoreModule">
-      <HintPath>..\..\COMPILER_HERE\game\UnityEngine.CoreModule.dll</HintPath>
+      <HintPath>$(Game_Path)\UnityEngine.CoreModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.UIModule">
-      <HintPath>..\..\COMPILER_HERE\game\UnityEngine.UIModule.dll</HintPath>
+      <HintPath>$(Game_Path)\UnityEngine.UIModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="UnityEngine.IMGUIModule">
-      <HintPath>..\..\COMPILER_HERE\game\UnityEngine.IMGUIModule.dll</HintPath>
+      <HintPath>$(Game_Path)\UnityEngine.IMGUIModule.dll</HintPath>
       <Private>False</Private>
     </Reference>
     <Reference Include="Rewired_Core">
-      <HintPath>..\..\COMPILER_HERE\game\Rewired_Core.dll</HintPath>
-      <Private>False</Private>
-      <Publicize>True</Publicize>
-    </Reference>
-    <Reference Include="Newtonsoft.Json">
-      <HintPath>..\..\ExtraInput\Newtonsoft.Json.dll</HintPath>
+      <HintPath>$(Game_Path)\Rewired_Core.dll</HintPath>
       <Private>False</Private>
     </Reference>
-  </ItemGroup>
-  <ItemGroup>
-    <EmbeddedResource Include="ExtraInputActions.json" />
+    <Reference Include="InputFramework">
+      <HintPath>$(SolutionDir)\InputFramework.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
   </ItemGroup>
 
 </Project>
