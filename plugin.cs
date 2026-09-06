@@ -10,7 +10,7 @@ using InputFramework;
 
 namespace SLine
 {
-    [BepInPlugin("com.sline", "SLine Target Mod", "1.6")]
+    [BepInPlugin("com.sline", "SLine Target Mod", "1.7")]
     public class SLineMod : BaseUnityPlugin
     {
         public enum LineCategory
